@@ -2,6 +2,8 @@
 
 An opinionated fzf-powered menu for Pacman
 
+![Preview of the Uninstall menu](https://github.com/MisterKartoffel/pacmenu/raw/main/images/preview.png)
+
 ## Requirements
 
 - [`paru`](https://github.com/Morganamilo/paru)
