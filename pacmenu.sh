@@ -60,7 +60,7 @@ function split_list() {
     printf '%s\n' "${INSTALLED[@]}" > "${FILES[installed]}" &
 }
 
-declare -i START_MODE=0 || exit 1
+declare START_MODE="repos" || exit 1
 
 declare -A FILES=(
     [installed]="/tmp/pac_installed.txt"
@@ -96,18 +96,17 @@ declare -a FZF_ARGS=(
     --bind="ctrl-s:reload(
                 MODE=\$(<\"/tmp/pac_mode.txt\")
                 case \$MODE in
-                    0) cat /tmp/pac_repos.txt ;;
-                    1) cat /tmp/pac_aur.txt ;;
-                    2) cat /tmp/pac_installed.txt ;;
+                    repos) cat /tmp/pac_repos.txt ;;
+                    aur) cat /tmp/pac_aur.txt ;;
+                    uninstall) cat /tmp/pac_installed.txt ;;
                 esac
             )+transform-input-label(
                 MODE=\$(<\"/tmp/pac_mode.txt\")
                 case \$MODE in
-                    0) echo \"⎸ AUR ⎹\" ;;
-                    1) echo \"⎸ Uninstall ⎹\" ;;
-                    2) echo \"⎸ [core] and [extra] ⎹\" ;;
+                    repos) MODE=\"aur\"; echo \"⎸ AUR ⎹\" ;;
+                    aur) MODE=\"uninstall\"; echo \"⎸ Uninstall ⎹\" ;;
+                    uninstall) MODE=\"repos\"; echo \"⎸ [core] and [extra] ⎹\" ;;
                 esac
-                MODE=\$(( (MODE + 1) % 3 ))
                 echo \$MODE > /tmp/pac_mode.txt
             )"
     --bind="result:transform-list-label(
@@ -117,36 +116,36 @@ declare -a FZF_ARGS=(
             )"
     --bind="multi:transform-footer(
                 if [[ \$FZF_SELECT_COUNT -ge 1 ]]; then
-                    [[ \$(<\"/tmp/pac_mode.txt\") == 2 ]] && COLOR=\$(tput setaf 1)
+                    [[ \$(<\"/tmp/pac_mode.txt\") == \"uninstall\" ]] && COLOR=\$(tput setaf 1)
                     printf '%s%s\n' \"\$COLOR\" {+}
                 fi
             )"
     --bind="load:transform-preview-label(
                 MODE=\$(<\"/tmp/pac_mode.txt\")
                 case \$MODE in
-                    0|2) echo \"⎸ {2} ⎹\" ;;
-                    1) echo \"⎸ {1} ⎹\" ;;
+                    repos|uninstall) echo \"⎸ {2} ⎹\" ;;
+                    aur) echo \"⎸ {1} ⎹\" ;;
                 esac
             )+preview(
                 MODE=\$(<\"/tmp/pac_mode.txt\")
                 case \$MODE in
-                    0) paru -Si {2} ;;
-                    1) paru -Si {1} ;;
-                    2) paru -Qi {2} ;;
+                    repos) paru -Si {2} ;;
+                    aur) paru -Si {1} ;;
+                    uninstall) paru -Qi {2} ;;
                 esac
             )"
     --bind="focus:transform-preview-label(
                 MODE=\$(<\"/tmp/pac_mode.txt\")
                 case \$MODE in
-                    0|2) echo \"⎸ {2} ⎹\" ;;
-                    1) echo \"⎸ {1} ⎹\" ;;
+                    repos|uninstall) echo \"⎸ {2} ⎹\" ;;
+                    aur) echo \"⎸ {1} ⎹\" ;;
                 esac
             )+preview(
                 MODE=\$(<\"/tmp/pac_mode.txt\")
                 case \$MODE in
-                    0) paru -Si {2} ;;
-                    1) paru -Si {1} ;;
-                    2) paru -Qi {2} ;;
+                    repos) paru -Si {2} ;;
+                    aur) paru -Si {1} ;;
+                    uninstall) paru -Qi {2} ;;
                 esac
             )"
     --color="info:#4C4F69,spinner:#4C4F69,border:#FAB387,label:#FAB387,
@@ -174,18 +173,18 @@ function main() {
     [[ -z "${SELECTION[*]}" ]] && echo "No packages selected." && exit 0
 
     case "$(<"${FILES[mode]}")" in
-        0)
+        repos)
             PACKAGES=("${SELECTION[@]#* }")
             PACKAGES=("${PACKAGES[@]%% *}")
             paru -S "${PACKAGES[@]}"
             ;;
 
-        1)
+        aur)
             PACKAGES=("${SELECTION[@]%% *}")
             paru -S "${PACKAGES[@]}"
             ;;
 
-        2)
+        uninstall)
             PACKAGES=("${SELECTION[@]#* }")
             PACKAGES=("${PACKAGES[@]%% *}")
             paru -Rns "${PACKAGES[@]}"
