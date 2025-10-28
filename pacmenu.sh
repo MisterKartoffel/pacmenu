@@ -13,6 +13,8 @@ pacmenu - An opinionated fzf-powered menu for Pacman
     Usage: pacmenu.sh [OPTIONS]
 
     Options:
+        -s [MENU]   Start mode: allows starting from any of the three
+                        available menus - repos, aur, uninstall
         -h          Help: show this help message.
 
     Menu actions:
@@ -56,14 +58,14 @@ function split_list() {
     done
 
     printf '%s\n' "${REPOS[@]}" > "${FILES[repos]}"
-    printf '%s\n' "${AUR[@]}" > "${FILES[aur]}" &
-    printf '%s\n' "${INSTALLED[@]}" > "${FILES[installed]}" &
+    printf '%s\n' "${AUR[@]}" > "${FILES[aur]}"
+    printf '%s\n' "${INSTALLED[@]}" > "${FILES[uninstall]}"
 }
 
 declare START_MODE="repos" || exit 1
 
 declare -A FILES=(
-    [installed]="/tmp/pac_installed.txt"
+    [uninstall]="/tmp/pac_uninstall.txt"
     [repos]="/tmp/pac_repos.txt"
     [aur]="/tmp/pac_aur.txt"
     [mode]="/tmp/pac_mode.txt"
@@ -81,7 +83,7 @@ declare -a FZF_ARGS=(
     --border-label="⎸ pacman ⎹"
     --prompt=": "
     --input-border="rounded"
-    --input-label="⎸ [core] and [extra] ⎹"
+    --input-label=""
     --list-border="rounded"
     --list-label=""
     --preview=""
@@ -92,13 +94,20 @@ declare -a FZF_ARGS=(
     --bind="change:first"
     --bind="start:transform-preview-label(
                 echo \"⎸ {2} ⎹\"
+            )+transform-input-label(
+                MODE=\$(<\"/tmp/pac_mode.txt\")
+                case \$MODE in
+                    repos) echo \"⎸ [core] and [extra] ⎹\" ;;
+                    aur) echo \"⎸ AUR ⎹\" ;;
+                    uninstall) echo \"⎸ Uninstall ⎹\" ;;
+                esac
             )"
     --bind="ctrl-s:reload(
                 MODE=\$(<\"/tmp/pac_mode.txt\")
                 case \$MODE in
                     repos) cat /tmp/pac_repos.txt ;;
                     aur) cat /tmp/pac_aur.txt ;;
-                    uninstall) cat /tmp/pac_installed.txt ;;
+                    uninstall) cat /tmp/pac_uninstall.txt ;;
                 esac
             )+transform-input-label(
                 MODE=\$(<\"/tmp/pac_mode.txt\")
@@ -156,11 +165,32 @@ declare -a FZF_ARGS=(
 ) || exit 1
 
 function main() {
-    declare OPT
-    while getopts "h" OPT; do
+    declare OPT OPTARG OPTIND
+    while getopts "s:h" OPT; do
         case "${OPT}" in
-            h) usage; exit 0;;
-            *) usage >&2; exit 1;;
+            s)
+                case "${OPTARG}" in
+                    repos|aur|uninstall)
+                        START_MODE="${OPTARG}"
+                        ;;
+
+                    *)
+                        echo "[ERROR] Invalid mode ${OPTARG}"
+                        usage >&2
+                        exit 1
+                        ;;
+                esac
+                ;;
+
+            h)
+                usage
+                exit 0
+                ;;
+
+            *)
+                usage >&2
+                exit 1
+                ;;
         esac
     done
 
@@ -169,7 +199,7 @@ function main() {
 
     echo "${START_MODE}" > "${FILES[mode]}" &
 
-    mapfile -t SELECTION < <(fzf "${FZF_ARGS[@]}" < "${FILES[repos]}") || exit 1
+    mapfile -t SELECTION < <(fzf "${FZF_ARGS[@]}" < "${FILES["${START_MODE}"]}") || exit 1
     [[ -z "${SELECTION[*]}" ]] && echo "No packages selected." && exit 0
 
     case "$(<"${FILES[mode]}")" in
