@@ -117,7 +117,7 @@ declare -a FZF_ARGS=(
     --bind="multi:transform-footer(
                 if [[ \$FZF_SELECT_COUNT -ge 1 ]]; then
                     [[ \$(<\"/tmp/pac_mode.txt\") == \"uninstall\" ]] && COLOR=\$(tput setaf 1)
-                    printf '%s%s\n' \"\$COLOR\" {+}
+                    printf \"\$COLOR%s\n\" {+}
                 fi
             )"
     --bind="load:transform-preview-label(
