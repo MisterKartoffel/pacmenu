@@ -174,7 +174,13 @@ function main() {
     [[ -z "${SELECTION[*]}" ]] && echo "No packages selected." && exit 0
 
     case "$(<"${FILES[mode]}")" in
-        0|1)
+        0)
+            PACKAGES=("${SELECTION[@]#* }")
+            PACKAGES=("${PACKAGES[@]%% *}")
+            paru -S "${PACKAGES[@]}"
+            ;;
+
+        1)
             PACKAGES=("${SELECTION[@]%% *}")
             paru -S "${PACKAGES[@]}"
             ;;
