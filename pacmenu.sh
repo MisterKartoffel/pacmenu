@@ -49,11 +49,11 @@ function split_list() {
 
     while read -r REPO PACKAGE VERSION OPTIONAL; do
         if [[ "${OPTIONAL}" == *"[installed]"* ]]; then
-            INSTALLED+=("${REPO} ${PACKAGE} ${VERSION}")
+            INSTALLED+=("${COLORS[gray]}${REPO} ${COLORS[white]}${PACKAGE} ${COLORS[gray]}${VERSION}")
         else
             [[ "${REPO}" == "aur" ]] && \
-                AUR+=("${PACKAGE} ${VERSION}") || \
-                REPOS+=("${REPO} ${PACKAGE} ${VERSION}")
+                AUR+=("${COLORS[white]}${PACKAGE} ${COLORS[gray]}${VERSION}") || \
+                REPOS+=("${COLORS[gray]}${REPO} ${COLORS[white]}${PACKAGE} ${COLORS[gray]}${VERSION}")
         fi
     done
 
@@ -71,12 +71,18 @@ declare -A FILES=(
     [mode]="/tmp/pac_mode.txt"
 ) || exit 1
 
+declare -A COLORS=(
+    [white]=$(tput setaf 15)
+    [gray]=$(tput setaf 0)
+)
+
 declare -a PACKAGES || exit 1
 declare -a DEPENDS=(fzf paru)
 declare -a FZF_ARGS=(
     --no-mouse
     --multi
     --sync
+    --ansi
     --reverse
     --info="inline-right"
     --border="rounded"
