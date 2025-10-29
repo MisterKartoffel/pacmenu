@@ -46,14 +46,16 @@ function check_depends() {
 
 function split_list() {
     declare -a INSTALLED REPOS AUR || exit 1
+    declare LIST_FORMAT REPO PACKAGE VERSION OPTIONAL
 
     while read -r REPO PACKAGE VERSION OPTIONAL; do
+        LIST_FORMAT="${COLORS[gray]}${REPO} ${COLORS[white]}${PACKAGE} ${COLORS[gray]}${VERSION}"
         if [[ "${OPTIONAL}" == *"[installed]"* ]]; then
-            INSTALLED+=("${COLORS[gray]}${REPO} ${COLORS[white]}${PACKAGE} ${COLORS[gray]}${VERSION}")
+            INSTALLED+=("${LIST_FORMAT}")
         else
             [[ "${REPO}" == "aur" ]] && \
-                AUR+=("${COLORS[white]}${PACKAGE} ${COLORS[gray]}${VERSION}") || \
-                REPOS+=("${COLORS[gray]}${REPO} ${COLORS[white]}${PACKAGE} ${COLORS[gray]}${VERSION}")
+                AUR+=("${LIST_FORMAT}") || \
+                REPOS+=("${LIST_FORMAT}")
         fi
     done
 
@@ -61,8 +63,6 @@ function split_list() {
     printf '%s\n' "${AUR[@]}" > "${FILES[aur]}"
     printf '%s\n' "${INSTALLED[@]}" > "${FILES[uninstall]}"
 }
-
-declare START_MODE="repos" || exit 1
 
 declare -A FILES=(
     [uninstall]="/tmp/pac_uninstall.txt"
@@ -126,42 +126,32 @@ declare -a FZF_ARGS=(
             )"
     --bind="result:transform-list-label(
                 [[ -n \$FZF_QUERY ]] && \\
-                    echo \"⎸ \$FZF_MATCH_COUNT matches for '\$FZF_QUERY' ⎹\" || \\
+                    echo \"⎸ \$FZF_MATCH_COUNT matches for '\$FZF_QUERY' ⎹\" || \
                     echo \"\"
             )"
     --bind="multi:transform-footer(
                 if [[ \$FZF_SELECT_COUNT -ge 1 ]]; then
-                    [[ \$(<\"/tmp/pac_mode.txt\") == \"uninstall\" ]] && COLOR=\$(tput setaf 1)
+                    MODE=\$(<\"/tmp/pac_mode.txt\")
+                    [[ \$MODE == \"uninstall\" ]] && \
+                        COLOR=\$(tput setaf 1)
                     printf \"\$COLOR%s\n\" {+}
                 fi
             )"
     --bind="load:transform-preview-label(
-                MODE=\$(<\"/tmp/pac_mode.txt\")
-                case \$MODE in
-                    repos|uninstall) echo \"⎸ {2} ⎹\" ;;
-                    aur) echo \"⎸ {1} ⎹\" ;;
-                esac
+                echo \"⎸ {2} ⎹\"
             )+preview(
                 MODE=\$(<\"/tmp/pac_mode.txt\")
-                case \$MODE in
-                    repos) paru -Si {2} ;;
-                    aur) paru -Si {1} ;;
-                    uninstall) paru -Qi {2} ;;
-                esac
+                [[ \$MODE == \"uninstall\" ]] && \
+                    paru -Qi {2} || \
+                    paru -Si {2}
             )"
     --bind="focus:transform-preview-label(
-                MODE=\$(<\"/tmp/pac_mode.txt\")
-                case \$MODE in
-                    repos|uninstall) echo \"⎸ {2} ⎹\" ;;
-                    aur) echo \"⎸ {1} ⎹\" ;;
-                esac
+                echo \"⎸ {2} ⎹\"
             )+preview(
                 MODE=\$(<\"/tmp/pac_mode.txt\")
-                case \$MODE in
-                    repos) paru -Si {2} ;;
-                    aur) paru -Si {1} ;;
-                    uninstall) paru -Qi {2} ;;
-                esac
+                [[ \$MODE == \"uninstall\" ]] && \
+                    paru -Qi {2} || \
+                    paru -Si {2}
             )"
     --color="info:#4C4F69,spinner:#4C4F69,border:#FAB387,label:#FAB387,
             prompt:#89B4FA,hl:#A6E3A1,hl+:#A6E3A1,input-border:#A6E3A1,
@@ -170,7 +160,10 @@ declare -a FZF_ARGS=(
             marker:#A6E3A1,preview-border:#89B4FA,preview-label:#89B4FA"
 ) || exit 1
 
+declare START_MODE="repos" || exit 1
+
 function main() {
+    declare -a SELECTION PACKAGES
     declare OPT OPTARG OPTIND
     while getopts "s:h" OPT; do
         case "${OPT}" in
@@ -208,21 +201,15 @@ function main() {
     mapfile -t SELECTION < <(fzf "${FZF_ARGS[@]}" < "${FILES["${START_MODE}"]}") || exit 1
     [[ -z "${SELECTION[*]}" ]] && echo "No packages selected." && exit 0
 
-    case "$(<"${FILES[mode]}")" in
-        repos)
-            PACKAGES=("${SELECTION[@]#* }")
-            PACKAGES=("${PACKAGES[@]%% *}")
-            paru -S "${PACKAGES[@]}"
-            ;;
+    PACKAGES=("${SELECTION[@]#* }")
+    PACKAGES=("${PACKAGES[@]%% *}")
 
-        aur)
-            PACKAGES=("${SELECTION[@]%% *}")
+    case "$(<"${FILES[mode]}")" in
+        repos|aur)
             paru -S "${PACKAGES[@]}"
             ;;
 
         uninstall)
-            PACKAGES=("${SELECTION[@]#* }")
-            PACKAGES=("${PACKAGES[@]%% *}")
             paru -Rns "${PACKAGES[@]}"
             ;;
 
