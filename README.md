@@ -2,7 +2,9 @@
 
 An opinionated fzf-powered menu for Pacman
 
-![Preview of the Uninstall menu](https://github.com/MisterKartoffel/pacmenu/raw/main/images/preview.png)
+<p align="center">
+    <img src="images/preview.png" alt="Preview of the Uninstall menu" width="600">
+</p>
 
 ## Requirements
 
@@ -30,6 +32,8 @@ chmod +x pacmenu.sh
 Usage: pacmenu.sh [OPTIONS]
 
 Options:
+    -s [MENU]   Start mode: allows starting from any of the three
+                    available menus - repos, aur, uninstall
     -h          Help: show this help message.
 
 Menu actions:
@@ -38,7 +42,7 @@ Menu actions:
     Enter       Submit selection.
 ```
 
-## Thanks to
+## Acknowledgements
 
-- [`bw-fzf`](https://github.com/radityaharya/bw-fzf): for being the first fzf menu script I dove deep into.
+- [`bw-fzf`](https://github.com/radityaharya/bw-fzf) for being the first fzf menu script I dove deep into.
 - User `id__a` of the [`Ghostty Discord Server`](https://discord.gg/ghostty) for their sneak peek of their own menu for brew, which inspired me to make this one (and from which the colors I stole).

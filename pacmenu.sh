@@ -7,7 +7,7 @@ function usage() {
 cat << EOF
 pacmenu - An opinionated fzf-powered menu for Pacman
 
-    Project URL:
+    Project URL: https://github.com/MisterKartoffel/pacmenu
     Author: Felipe Duarte <felipesdrs@hotmail.com>
 
     Usage: pacmenu.sh [OPTIONS]
