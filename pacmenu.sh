@@ -38,10 +38,12 @@ function cleanup() {
 }
 
 function check_depends() {
-    if ! command -v "${DEPENDS[@]}" >/dev/null; then
-        echo "${COMMAND} is missing. Exiting."
-        exit 1
-    fi
+    for COMMAND in "${DEPENDS[@]}"; do
+        if ! command -v "${COMMAND}" >/dev/null; then
+            echo "${COMMAND} is missing. Exiting."
+            exit 1
+        fi
+    done
 }
 
 function split_list() {
