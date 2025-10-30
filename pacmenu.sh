@@ -49,23 +49,20 @@ function check_depends() {
 }
 
 function split_list() {
-    declare -a INSTALLED REPOS AUR || exit 1
-    declare LIST_FORMAT REPO PACKAGE VERSION OPTIONAL
+    declare TARGET LIST_FORMAT REPO PACKAGE VERSION OPTIONAL
 
     while read -r REPO PACKAGE VERSION OPTIONAL; do
         LIST_FORMAT="${COLORS[gray]}${REPO} ${COLORS[white]}${PACKAGE} ${COLORS[gray]}${VERSION}"
         if [[ "${OPTIONAL}" == *"[installed]"* ]]; then
-            INSTALLED+=("${LIST_FORMAT}")
+            TARGET="${FILES[uninstall]}"
         else
             [[ "${REPO}" == "aur" ]] && \
-                AUR+=("${LIST_FORMAT}") || \
-                REPOS+=("${LIST_FORMAT}")
+                TARGET="${FILES[aur]}" || \
+                TARGET="${FILES[repos]}"
         fi
-    done
 
-    printf '%s\n' "${REPOS[@]}" > "${FILES[repos]}"
-    printf '%s\n' "${AUR[@]}" > "${FILES[aur]}"
-    printf '%s\n' "${INSTALLED[@]}" > "${FILES[uninstall]}"
+        echo "${LIST_FORMAT}" >> "${TARGET}"
+    done
 }
 
 declare -A FILES=(
