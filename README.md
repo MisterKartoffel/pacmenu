@@ -6,10 +6,16 @@ An opinionated fzf-powered menu for Pacman
     <img src="images/preview.png" alt="Preview of the Uninstall menu" width="600">
 </p>
 
-## Requirements
+## Dependencies
 
-- [`paru`](https://github.com/Morganamilo/paru)
+### Required
 - [`fzf`](https://github.com/junegunn/fzf)
+
+### Optional
+- An AUR helper:
+    - [`paru`](https://github.com/Morganamilo/paru)
+    - [`yay`](https://github.com/Jguer/yay)
+    - Others (not coded out of the box)
 
 ## Installation
 
@@ -32,8 +38,10 @@ chmod +x pacmenu.sh
 Usage: pacmenu.sh [OPTIONS]
 
 Options:
+    -p          Package manager: selects a package manager to use,
+                        enabling the aur menu if applicable.
     -s [MENU]   Start mode: allows starting from any of the three
-                    available menus - repos, aur, uninstall
+                        available menus - repos, aur, uninstall.
     -h          Help: show this help message.
 
 Menu actions:
