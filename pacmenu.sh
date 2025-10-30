@@ -13,8 +13,10 @@ pacmenu - An opinionated fzf-powered menu for Pacman
     Usage: pacmenu.sh [OPTIONS]
 
     Options:
+        -p          Package manager: selects a package manager to use,
+                        enabling the aur menu if applicable.
         -s [MENU]   Start mode: allows starting from any of the three
-                        available menus - repos, aur, uninstall
+                        available menus - repos, aur, uninstall.
         -h          Help: show this help message.
 
     Menu actions:
@@ -71,6 +73,7 @@ declare -A FILES=(
     [repos]="/tmp/pac_repos.txt"
     [aur]="/tmp/pac_aur.txt"
     [mode]="/tmp/pac_mode.txt"
+    [manager]="/tmp/pac_manager.txt"
 ) || exit 1
 
 declare -A COLORS=(
@@ -79,7 +82,7 @@ declare -A COLORS=(
 )
 
 declare -a PACKAGES || exit 1
-declare -a DEPENDS=(fzf paru)
+declare -a DEPENDS=(fzf)
 declare -a FZF_ARGS=(
     --no-mouse
     --multi
@@ -110,31 +113,47 @@ declare -a FZF_ARGS=(
                     uninstall) echo \"⎸ Uninstall ⎹\" ;;
                 esac
             )"
-    --bind="ctrl-s:reload(
+    --bind="ctrl-s:transform-input-label(
+                MODE=\$(<\"/tmp/pac_mode.txt\")
+                case \$MODE in
+                    repos)
+                        if [[ \$(<\"/tmp/pac_manager.txt\") != \"pacman\" ]]; then
+                            MODE=\"aur\"
+                            echo \"⎸ AUR ⎹\"
+                        else
+                            MODE=\"uninstall\"
+                            echo \"⎸ Uninstall ⎹\"
+                        fi
+                    ;;
+
+                    aur)
+                        MODE=\"uninstall\"
+                        echo \"⎸ Uninstall ⎹\"
+                    ;;
+
+                    uninstall)
+                        MODE=\"repos\"
+                        echo \"⎸ [core] and [extra] ⎹\"
+                    ;;
+                esac
+                echo \$MODE > /tmp/pac_mode.txt
+            )+reload(
                 MODE=\$(<\"/tmp/pac_mode.txt\")
                 case \$MODE in
                     repos) cat /tmp/pac_repos.txt ;;
                     aur) cat /tmp/pac_aur.txt ;;
                     uninstall) cat /tmp/pac_uninstall.txt ;;
                 esac
-            )+transform-input-label(
-                MODE=\$(<\"/tmp/pac_mode.txt\")
-                case \$MODE in
-                    repos) MODE=\"aur\"; echo \"⎸ AUR ⎹\" ;;
-                    aur) MODE=\"uninstall\"; echo \"⎸ Uninstall ⎹\" ;;
-                    uninstall) MODE=\"repos\"; echo \"⎸ [core] and [extra] ⎹\" ;;
-                esac
-                echo \$MODE > /tmp/pac_mode.txt
             )"
     --bind="result:transform-list-label(
                 [[ -n \$FZF_QUERY ]] && \\
-                    echo \"⎸ \$FZF_MATCH_COUNT matches for '\$FZF_QUERY' ⎹\" || \
+                    echo \"⎸ \$FZF_MATCH_COUNT matches for '\$FZF_QUERY' ⎹\" || \\
                     echo \"\"
             )"
     --bind="multi:transform-footer(
                 if [[ \$FZF_SELECT_COUNT -ge 1 ]]; then
                     MODE=\$(<\"/tmp/pac_mode.txt\")
-                    [[ \$MODE == \"uninstall\" ]] && \
+                    [[ \$MODE == \"uninstall\" ]] && \\
                         COLOR=\$(tput setaf 1)
                     printf \"\$COLOR%s\n\" {+}
                 fi
@@ -143,17 +162,19 @@ declare -a FZF_ARGS=(
                 echo \"⎸ {2} ⎹\"
             )+preview(
                 MODE=\$(<\"/tmp/pac_mode.txt\")
-                [[ \$MODE == \"uninstall\" ]] && \
-                    paru -Qi {2} || \
-                    paru -Si {2}
+                PKG_MANAGER=\$(<\"/tmp/pac_manager.txt\")
+                [[ \$MODE == \"uninstall\" ]] && \\
+                    \$PKG_MANAGER -Qi {2} || \\
+                    \$PKG_MANAGER -Si {2}
             )"
     --bind="focus:transform-preview-label(
                 echo \"⎸ {2} ⎹\"
             )+preview(
                 MODE=\$(<\"/tmp/pac_mode.txt\")
-                [[ \$MODE == \"uninstall\" ]] && \
-                    paru -Qi {2} || \
-                    paru -Si {2}
+                PKG_MANAGER=\$(<\"/tmp/pac_manager.txt\")
+                [[ \$MODE == \"uninstall\" ]] && \\
+                    \$PKG_MANAGER -Qi {2} || \\
+                    \$PKG_MANAGER -Si {2}
             )"
     --color="info:#4C4F69,spinner:#4C4F69,border:#FAB387,label:#FAB387,
             prompt:#89B4FA,hl:#A6E3A1,hl+:#A6E3A1,input-border:#A6E3A1,
@@ -162,16 +183,40 @@ declare -a FZF_ARGS=(
             marker:#A6E3A1,preview-border:#89B4FA,preview-label:#89B4FA"
 ) || exit 1
 
+declare PKG_MANAGER="pacman" || exit 1
 declare START_MODE="repos" || exit 1
 
 function main() {
     declare -a SELECTION PACKAGES
     declare OPT OPTARG OPTIND
-    while getopts "s:h" OPT; do
+    while getopts "p:s:h" OPT; do
         case "${OPT}" in
+            p)
+                case "${OPTARG}" in
+                    paru|yay)
+                        PKG_MANAGER="${OPTARG}"
+                        DEPENDS+=("${PKG_MANAGER}")
+                        ;;
+
+                    *)
+                        echo "[ERROR] Invalid package manager ${OPTARG}"
+                        usage >&2
+                        exit 1
+                        ;;
+                esac
+                ;;
+
             s)
                 case "${OPTARG}" in
-                    repos|aur|uninstall)
+                    aur)
+                        if [[ "${PKG_MANAGER}" == "pacman" ]]; then
+                            echo "[ERROR] Invalid mode ${OPTARG} with package manager ${PKG_MANAGER}"
+                            usage >&2
+                            exit 1
+                        fi
+                        ;&
+
+                    repos|uninstall)
                         START_MODE="${OPTARG}"
                         ;;
 
@@ -196,8 +241,9 @@ function main() {
     done
 
     check_depends
-    split_list < <(paru -Sl)
+    split_list < <(${PKG_MANAGER} -Sl)
 
+    echo "${PKG_MANAGER}" > "${FILES[manager]}" &
     echo "${START_MODE}" > "${FILES[mode]}" &
 
     mapfile -t SELECTION < <(fzf "${FZF_ARGS[@]}" < "${FILES["${START_MODE}"]}") || exit 1
@@ -208,11 +254,11 @@ function main() {
 
     case "$(<"${FILES[mode]}")" in
         repos|aur)
-            paru -S "${PACKAGES[@]}"
+            "${PKG_MANAGER}" -S "${PACKAGES[@]}"
             ;;
 
         uninstall)
-            paru -Rns "${PACKAGES[@]}"
+            "${PKG_MANAGER}" -Rns "${PACKAGES[@]}"
             ;;
 
         *)
