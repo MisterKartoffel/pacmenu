@@ -70,7 +70,6 @@ declare -A FILES=(
     [repos]="/tmp/pac_repos.txt"
     [aur]="/tmp/pac_aur.txt"
     [mode]="/tmp/pac_mode.txt"
-    [manager]="/tmp/pac_manager.txt"
 ) || exit 1
 
 declare -A COLORS=(
@@ -114,7 +113,7 @@ declare -a FZF_ARGS=(
                 MODE=\$(<\"/tmp/pac_mode.txt\")
                 case \$MODE in
                     repos)
-                        if [[ \$(<\"/tmp/pac_manager.txt\") != \"pacman\" ]]; then
+                        if [[ \$PKG_MANAGER != \"pacman\" ]]; then
                             MODE=\"aur\"
                             echo \"⎸ AUR ⎹\"
                         else
@@ -159,7 +158,6 @@ declare -a FZF_ARGS=(
                 echo \"⎸ {2} ⎹\"
             )+preview(
                 MODE=\$(<\"/tmp/pac_mode.txt\")
-                PKG_MANAGER=\$(<\"/tmp/pac_manager.txt\")
                 [[ \$MODE == \"uninstall\" ]] && \\
                     \$PKG_MANAGER -Qi {2} || \\
                     \$PKG_MANAGER -Si {2}
@@ -168,7 +166,6 @@ declare -a FZF_ARGS=(
                 echo \"⎸ {2} ⎹\"
             )+preview(
                 MODE=\$(<\"/tmp/pac_mode.txt\")
-                PKG_MANAGER=\$(<\"/tmp/pac_manager.txt\")
                 [[ \$MODE == \"uninstall\" ]] && \\
                     \$PKG_MANAGER -Qi {2} || \\
                     \$PKG_MANAGER -Si {2}
@@ -240,7 +237,7 @@ function main() {
     check_depends
     split_list < <(${PKG_MANAGER} -Sl)
 
-    echo "${PKG_MANAGER}" > "${FILES[manager]}" &
+    export PKG_MANAGER
     echo "${START_MODE}" > "${FILES[mode]}" &
 
     mapfile -t SELECTION < <(fzf "${FZF_ARGS[@]}" < "${FILES["${START_MODE}"]}") || exit 1
