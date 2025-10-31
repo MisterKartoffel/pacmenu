@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # TODO: issuing a reload() while streaming in input
-# causes a crash, debug
+# causes list parsing to stop, debug
 
 trap 'exit_handler' INT TERM
 trap 'cleanup' EXIT
@@ -61,15 +61,14 @@ function populate_lists() {
         FORMATS[1]="${COLORS[gray]}${REPO} ${COLORS[white]}${PACKAGE} ${COLORS[gray]}${VERSION}"
         FORMATS[0]="${FORMATS[1]} ${INSTALLED}"
 
-        [[ "${REPO}" == "aur" ]] && TARGETS[0]="${FILES["${REPO}"]}" || TARGETS[0]="${FILES[repos]}"
-        [[ "${INSTALLED}" == "[installed]" ]] && TARGETS[1]="${FILES[uninstall]}" || TARGETS[1]="/dev/null"
+        [[ "${REPO}" == "aur" ]]              && TARGETS+=("${FILES["${REPO}"]}") || TARGETS+=("${FILES[repos]}")
+        [[ "${INSTALLED}" == "[installed]" ]] && TARGETS+=("${FILES[uninstall]}") || TARGETS+=("/dev/null")
+                                                 TARGETS+=("${FILES[pipe]}")
 
         for i in "${!TARGETS[@]}"; do
             [[ "${TARGETS[i]}" == "${FILES["${START_MODE}"]}" ]] && FORMATS[2]="${FORMATS[i]}"
             printf "%b\n" "${FORMATS[i]}" >> "${TARGETS[i]}"
         done
-
-        printf "%b\n" "${FORMATS[2]}" >&3
 
         TARGETS=()
     done
