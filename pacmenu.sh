@@ -16,11 +16,13 @@ pacmenu - An opinionated fzf-powered menu for Pacman
     Usage: pacmenu.sh [OPTIONS]
 
     Options:
-        -p          Package manager: selects a package manager to use,
-                        enabling the aur menu if applicable.
-        -s [MENU]   Start mode: allows starting from any of the three
-                        available menus - repos, aur, uninstall.
-        -h          Help: show this help message.
+        -p [paru|yay]   Package manager: selects alternative package manager
+                            to use, enabling the aur menu if applicable.
+        -s [MENU]       Start mode: allows starting from any of the three
+                            available menus - repos, aur, uninstall.
+        -r              Reinstall: shows installed packages in the install
+                            menus with the "[installed]" tag.
+        -h              Help: show this help message.
 
     Menu actions:
         Ctrl-s      Cycle between menus.
@@ -61,9 +63,13 @@ function populate_lists() {
         FORMATS[1]="${COLORS[gray]}${REPO} ${COLORS[white]}${PACKAGE} ${COLORS[gray]}${VERSION}"
         FORMATS[0]="${FORMATS[1]} ${INSTALLED}"
 
-        [[ "${REPO}" == "aur" ]]              && TARGETS+=("${FILES["${REPO}"]}") || TARGETS+=("${FILES[repos]}")
-        [[ "${INSTALLED}" == "[installed]" ]] && TARGETS+=("${FILES[uninstall]}") || TARGETS+=("/dev/null")
-                                                 TARGETS+=("${FILES[pipe]}")
+        [[ "${REPO}" == "aur" ]] && TARGETS[0]="${FILES[aur]}"       || TARGETS[0]="${FILES[repos]}"
+        [[ -n "${INSTALLED}" ]]  && TARGETS[1]="${FILES[uninstall]}" || TARGETS[1]="/dev/null"
+                                    TARGETS[2]="${FILES[pipe]}"
+
+        [[ -z "${REINSTALL}" && -n "${INSTALLED}" ]] \
+                                 && TARGETS[0]="/dev/null" \
+                                 && TARGETS[2]="/dev/null"
 
         for i in "${!TARGETS[@]}"; do
             [[ "${TARGETS[i]}" == "${FILES["${START_MODE}"]}" ]] && FORMATS[2]="${FORMATS[i]}"
@@ -86,8 +92,8 @@ declare -A FILES=(
 ) || exit 1
 
 declare -A COLORS=(
-    [white]=$(tput setaf 15)
-    [gray]=$(tput setaf 0)
+    [white]="\x1b[39m"
+    [gray]="\x1b[90m"
 ) || exit 1
 
 declare -a PACKAGES || exit 1
@@ -190,12 +196,12 @@ declare -a FZF_ARGS=(
 
 declare PKG_MANAGER="pacman" || exit 1
 declare START_MODE="repos" || exit 1
-declare FZF_PID
+declare REINSTALL FZF_PID
 
 function main() {
     declare -a SELECTION PACKAGES
     declare OPT OPTARG OPTIND
-    while getopts "p:s:h" OPT; do
+    while getopts "p:s:rh" OPT; do
         case "${OPT}" in
             p)
                 case "${OPTARG}" in
@@ -233,6 +239,8 @@ function main() {
                         ;;
                 esac
                 ;;
+
+            r) REINSTALL=1;;
 
             h)
                 usage
