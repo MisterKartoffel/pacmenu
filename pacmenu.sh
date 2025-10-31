@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+#
+# TODO: The reload in line 176 is quite memory intensive, look into alternatives.
 
 trap 'exit_handler' INT TERM
 trap 'cleanup' EXIT
@@ -48,20 +50,22 @@ function check_depends() {
     done
 }
 
-function split_list() {
-    declare TARGET LIST_FORMAT REPO PACKAGE VERSION OPTIONAL
+function populate_lists() {
+    declare REPO PACKAGE VERSION INSTALLED || exit 1
+    declare -a TARGETS FORMATS || exit 1
 
-    while read -r REPO PACKAGE VERSION OPTIONAL; do
-        LIST_FORMAT="${COLORS[gray]}${REPO} ${COLORS[white]}${PACKAGE} ${COLORS[gray]}${VERSION}"
+    while read -r REPO PACKAGE VERSION INSTALLED; do
+        FORMATS[1]="${COLORS[gray]}${REPO} ${COLORS[white]}${PACKAGE} ${COLORS[gray]}${VERSION}"
+        FORMATS[0]="${FORMATS[1]} ${INSTALLED}"
 
-        if [[ "${OPTIONAL}" == "[installed]" ]]; then
-            TARGET="${FILES[uninstall]}"
-            printf "%b\n" "${LIST_FORMAT}" >> "${TARGET}"
-        fi
+        [[ "${REPO}" == "aur" ]] && TARGETS+=("${FILES["${REPO}"]}") || TARGETS+=("${FILES[repos]}")
+        [[ "${INSTALLED}" == "[installed]" ]] && TARGETS+=("${FILES[uninstall]}")
 
-        [[ "${REPO}" == "aur" ]] && TARGET="${FILES[aur]}" || TARGET="${FILES[repos]}"
-        LIST_FORMAT+=" ${OPTIONAL}"
-        printf "%b\n" "${LIST_FORMAT}" >> "${TARGET}"
+        for i in "${!TARGETS[@]}"; do
+            printf "%b\n" "${FORMATS[i]}" >> "${TARGETS[i]}"
+        done
+
+        TARGETS=()
     done
 }
 
@@ -75,10 +79,10 @@ declare -A FILES=(
 declare -A COLORS=(
     [white]=$(tput setaf 15)
     [gray]=$(tput setaf 0)
-)
+) || exit 1
 
 declare -a PACKAGES || exit 1
-declare -a DEPENDS=(fzf)
+declare -a DEPENDS=(fzf) || exit 1
 declare -a FZF_ARGS=(
     --no-mouse
     --multi
@@ -169,6 +173,13 @@ declare -a FZF_ARGS=(
                 [[ \$MODE == \"uninstall\" ]] && \\
                     \$PKG_MANAGER -Qi {2} || \\
                     \$PKG_MANAGER -Si {2}
+            )+reload(
+                MODE=\$(<\"/tmp/pac_mode.txt\")
+                case \$MODE in
+                    repos) cat /tmp/pac_repos.txt ;;
+                    aur) cat /tmp/pac_aur.txt ;;
+                    uninstall) cat /tmp/pac_uninstall.txt ;;
+                esac
             )"
     --color="info:#4C4F69,spinner:#4C4F69,border:#FAB387,label:#FAB387,
             prompt:#89B4FA,hl:#A6E3A1,hl+:#A6E3A1,input-border:#A6E3A1,
@@ -235,10 +246,11 @@ function main() {
     done
 
     check_depends
-    split_list < <(${PKG_MANAGER} -Sl)
+    populate_lists < <(${PKG_MANAGER} -Sl) &
 
     export PKG_MANAGER
     echo "${START_MODE}" > "${FILES[mode]}" &
+    while [[ ! -f "${FILES["${START_MODE}"]}" ]]; do true; done
 
     mapfile -t SELECTION < <(fzf "${FZF_ARGS[@]}" < "${FILES["${START_MODE}"]}") || exit 1
     [[ -z "${SELECTION[*]}" ]] && echo "No packages selected." && exit 0
