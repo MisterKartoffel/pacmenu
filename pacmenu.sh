@@ -53,15 +53,15 @@ function split_list() {
 
     while read -r REPO PACKAGE VERSION OPTIONAL; do
         LIST_FORMAT="${COLORS[gray]}${REPO} ${COLORS[white]}${PACKAGE} ${COLORS[gray]}${VERSION}"
-        if [[ "${OPTIONAL}" == *"[installed]"* ]]; then
+
+        if [[ "${OPTIONAL}" == "[installed]" ]]; then
             TARGET="${FILES[uninstall]}"
-        else
-            [[ "${REPO}" == "aur" ]] && \
-                TARGET="${FILES[aur]}" || \
-                TARGET="${FILES[repos]}"
+            printf "%b\n" "${LIST_FORMAT}" >> "${TARGET}"
         fi
 
-        echo "${LIST_FORMAT}" >> "${TARGET}"
+        [[ "${REPO}" == "aur" ]] && TARGET="${FILES[aur]}" || TARGET="${FILES[repos]}"
+        LIST_FORMAT+=" ${OPTIONAL}"
+        printf "%b\n" "${LIST_FORMAT}" >> "${TARGET}"
     done
 }
 
