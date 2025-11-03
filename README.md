@@ -38,13 +38,17 @@ chmod +x pacmenu.sh
 Usage: pacmenu.sh [OPTIONS]
 
 Options:
-    -p [paru|yay]   Package manager: selects alternative package manager
-                        to use, enabling the aur menu if applicable.
-    -s [MENU]       Start mode: allows starting from any of the three
-                        available menus - repos, aur, uninstall.
-    -r              Reinstall: shows installed packages in the install
-                        menus with the "[installed]" tag.
-    -h              Help: show this help message.
+    -p, --package-manager [paru|yay]
+            select alternative package manager to use, enabling the aur menu if applicable.
+
+    -s, --start-mode [repos|aur|uninstall]
+            allows starting from any of the three available menus.
+
+    -r, --reinstall
+            shows installed packages in the install menus with the "[installed]" tag.
+
+    -h, --help
+            show this help message.
 
 Menu actions:
     Ctrl-s      Cycle between menus.
