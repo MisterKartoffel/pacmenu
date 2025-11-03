@@ -10,24 +10,28 @@ function usage() {
 cat << EOF
 pacmenu - An opinionated fzf-powered menu for Pacman
 
-    Project URL: https://github.com/MisterKartoffel/pacmenu
-    Author: Felipe Duarte <felipesdrs@hotmail.com>
+    ${ANSI[bold]}Project URL:${ANSI[reset]} ${ANSI[italic]}https://github.com/MisterKartoffel/pacmenu${ANSI[reset]}
+    ${ANSI[bold]}Author:${ANSI[reset]} Felipe Duarte ${ANSI[italic]}<felipesdrs@hotmail.com>${ANSI[reset]}
 
-    Usage: pacmenu.sh [OPTIONS]
+    ${ANSI[bold]}Usage: pacmenu.sh${ANSI[reset]} [OPTIONS]
 
-    Options:
-        -p [paru|yay]   Package manager: selects alternative package manager
-                            to use, enabling the aur menu if applicable.
-        -s [MENU]       Start mode: allows starting from any of the three
-                            available menus - repos, aur, uninstall.
-        -r              Reinstall: shows installed packages in the install
-                            menus with the "[installed]" tag.
-        -h              Help: show this help message.
+    ${ANSI[bold]}Options:${ANSI[reset]}
+        ${ANSI[bold]}-p, --package-manager${ANSI[reset]} [paru|yay]
+                select alternative package manager to use, enabling the aur menu if applicable.
 
-    Menu actions:
-        Ctrl-s      Cycle between menus.
-        Tab         Select current item.
-        Enter       Submit selection.
+        ${ANSI[bold]}-s, --start-mode${ANSI[reset]} [repos|aur|uninstall]
+                allows starting from any of the three available menus.
+
+        ${ANSI[bold]}-r, --reinstall${ANSI[reset]}
+                shows installed packages in the install menus with the "[installed]" tag.
+
+        ${ANSI[bold]}-h, --help${ANSI[reset]}
+                show this help message.
+
+    ${ANSI[bold]}Menu actions:${ANSI[reset]}
+        ${ANSI[bold]}Ctrl-s${ANSI[reset]}      Cycle between menus.
+        ${ANSI[bold]}Tab${ANSI[reset]}         Select current item.
+        ${ANSI[bold]}Enter${ANSI[reset]}       Submit selection.
 EOF
 }
 
@@ -43,6 +47,30 @@ function cleanup() {
     pkill -P "${FZF_PID}" 2>/dev/null || true
     pkill -P "${$}" 2>/dev/null || true
     wait 2>/dev/null || true
+}
+
+function arg_error() {
+    declare TYPE="${1}"
+    declare OPTION="${2}"
+    declare ARGUMENT="${3}"
+    declare COMMENT="${4}"
+
+    case "${TYPE}" in
+        option)
+            printf "%s: invalid option -- '%s'\n%s\n" \
+                "${PROGRAM_NAME}" \
+                "${OPTION}" \
+                "${COMMENT}" ;;
+
+        argument)
+            printf "%s: invalid argument for '%s' -- '%s'\n%s\n" \
+                "${PROGRAM_NAME}" \
+                "${OPTION}" \
+                "${ARGUMENT}" \
+                "${COMMENT}" ;;
+
+        *) exit 1 ;;
+    esac
 }
 
 function check_depends() {
@@ -82,6 +110,11 @@ function populate_lists() {
     exec 3>&-
 }
 
+declare PKG_MANAGER="pacman" || exit 1
+declare START_MODE="repos" || exit 1
+declare PROGRAM_NAME="pacmenu" || exit 1
+declare REINSTALL WRITER_PID || exit 1
+
 declare -A FILES=(
     [uninstall]="/tmp/pac_uninstall.txt"
     [repos]="/tmp/pac_repos.txt"
@@ -91,9 +124,11 @@ declare -A FILES=(
     [selection]="/tmp/pac_selection.txt"
 ) || exit 1
 
-declare -A COLORS=(
-    [white]="\x1b[39m"
-    [gray]="\x1b[90m"
+declare -A ANSI=(
+    [gray]="$(tput setaf 0)"
+    [bold]="$(tput bold)"
+    [italic]="$(tput sitm)"
+    [reset]="$(tput sgr0)"
 ) || exit 1
 
 declare -a PACKAGES || exit 1
@@ -194,63 +229,55 @@ declare -a FZF_ARGS=(
             hl:#A6E3A1,hl+:#A6E3A1,footer-fg:#89B4FA"
 ) || exit 1
 
-declare PKG_MANAGER="pacman" || exit 1
-declare START_MODE="repos" || exit 1
-declare REINSTALL FZF_PID
-
 function main() {
     declare -a SELECTION PACKAGES
-    declare OPT OPTARG OPTIND
-    while getopts "p:s:rh" OPT; do
-        case "${OPT}" in
-            p)
-                case "${OPTARG}" in
+
+    while [[ "${#}" -gt 0 ]]; do
+        case "${1}" in
+            -p|--package-manager)
+                case "${2}" in
                     paru|yay)
-                        PKG_MANAGER="${OPTARG}"
+                        PKG_MANAGER="${2}"
                         DEPENDS+=("${PKG_MANAGER}")
-                        ;;
+                        shift 2 ;;
 
                     *)
-                        echo "[ERROR] Invalid package manager ${OPTARG}"
+                        arg_error "argument" "${1}" "${2}"
                         usage >&2
-                        exit 1
-                        ;;
-                esac
-                ;;
+                        exit 1 ;;
+                esac ;;
 
-            s)
-                case "${OPTARG}" in
+            -s|--start-mode)
+                case "${2}" in
                     aur)
                         if [[ "${PKG_MANAGER}" == "pacman" ]]; then
-                            echo "[ERROR] Invalid mode ${OPTARG} with package manager ${PKG_MANAGER}"
+                            arg_error "argument" "${1}" "${2}" "(choose an aur-compatible package manager for aur mode)\n"
                             usage >&2
                             exit 1
-                        fi
-                        ;;
+                        fi ;&
 
                     repos|uninstall)
-                        START_MODE="${OPTARG}"
-                        ;;
+                        START_MODE="${2}"
+                        shift 2 ;;
 
                     *)
-                        echo "[ERROR] Invalid mode ${OPTARG}"
+                        arg_error "argument" "${1}" "${2}"
                         usage >&2
-                        exit 1
-                        ;;
-                esac
-                ;;
+                        exit 1 ;;
+                esac ;;
 
-            r) REINSTALL=1;;
+            -r|--reinstall)
+                REINSTALL=1
+                shift ;;
 
-            h)
+            -h|--help)
                 usage
-                exit 0
-                ;;
+                exit 0 ;;
 
             *)
+                arg_error "option" "${1}" "${2}"
                 usage >&2
-                exit 1
-                ;;
+                exit 1 ;;
         esac
     done
 
