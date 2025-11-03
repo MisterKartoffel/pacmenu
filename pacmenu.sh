@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-#
-# TODO: issuing a reload() while streaming in input
-# causes list parsing to stop, debug
 
 trap 'exit_handler' INT TERM
 trap 'cleanup' EXIT
@@ -44,7 +41,6 @@ function exit_handler() {
 function cleanup() {
     rm -f "${FILES[@]}" 2>/dev/null
 
-    pkill -P "${FZF_PID}" 2>/dev/null || true
     pkill -P "${$}" 2>/dev/null || true
     wait 2>/dev/null || true
 }
@@ -85,29 +81,19 @@ function check_depends() {
 function populate_lists() {
     declare REPO PACKAGE VERSION INSTALLED || exit 1
     declare -a TARGETS FORMATS || exit 1
-    exec 3>"${FILES[pipe]}" || exit 1
 
     while read -r REPO PACKAGE VERSION INSTALLED; do
-        FORMATS[1]="${COLORS[gray]}${REPO} ${COLORS[white]}${PACKAGE} ${COLORS[gray]}${VERSION}"
+        FORMATS[1]="${ANSI[gray]}${REPO}${ANSI[reset]} ${PACKAGE} ${ANSI[gray]}${VERSION}"
         FORMATS[0]="${FORMATS[1]} ${INSTALLED}"
 
         [[ "${REPO}" == "aur" ]] && TARGETS[0]="${FILES[aur]}"       || TARGETS[0]="${FILES[repos]}"
         [[ -n "${INSTALLED}" ]]  && TARGETS[1]="${FILES[uninstall]}" || TARGETS[1]="/dev/null"
-                                    TARGETS[2]="${FILES[pipe]}"
-
-        [[ -z "${REINSTALL}" && -n "${INSTALLED}" ]] \
-                                 && TARGETS[0]="/dev/null" \
-                                 && TARGETS[2]="/dev/null"
+        [[ -z "${REINSTALL}" && -n "${INSTALLED}" ]] && TARGETS[0]="/dev/null"
 
         for i in "${!TARGETS[@]}"; do
-            [[ "${TARGETS[i]}" == "${FILES["${START_MODE}"]}" ]] && FORMATS[2]="${FORMATS[i]}"
             printf "%b\n" "${FORMATS[i]}" >> "${TARGETS[i]}"
         done
-
-        TARGETS=()
     done
-
-    exec 3>&-
 }
 
 declare PKG_MANAGER="pacman" || exit 1
@@ -120,8 +106,6 @@ declare -A FILES=(
     [repos]="/tmp/pac_repos.txt"
     [aur]="/tmp/pac_aur.txt"
     [mode]="/tmp/pac_mode.txt"
-    [pipe]="/tmp/pac_pipe"
-    [selection]="/tmp/pac_selection.txt"
 ) || exit 1
 
 declare -A ANSI=(
@@ -222,10 +206,17 @@ declare -a FZF_ARGS=(
                 [[ \$MODE == \"uninstall\" ]] && \\
                     \$PKG_MANAGER -Qi {2} || \\
                     \$PKG_MANAGER -Si {2}
+            )+reload(
+                MODE=\$(<\"/tmp/pac_mode.txt\")
+                case \$MODE in
+                    repos) cat /tmp/pac_repos.txt ;;
+                    aur) cat /tmp/pac_aur.txt ;;
+                    uninstall) cat /tmp/pac_uninstall.txt ;;
+                esac
             )"
     --color="prompt:#89B4FA,info:#4C4F69,spinner:#4C4F69,border:#FAB387,marker:#A6E3A1,
             label:#FAB387,input-label:#A6E3A1,list-label:#CDD6F4,preview-label:#89B4FA,footer-label:#4C4F69,
-            input-border:#A6E3A1,list-border:#CDD6F4,preview-border:#89B4FA, footer-border:#4C4F69,
+            input-border:#A6E3A1,list-border:#CDD6F4,preview-border:#89B4FA,footer-border:#4C4F69,
             hl:#A6E3A1,hl+:#A6E3A1,footer-fg:#89B4FA"
 ) || exit 1
 
@@ -284,18 +275,16 @@ function main() {
     check_depends
 
     export PKG_MANAGER
-    mkfifo "${FILES[pipe]}"
     echo "${START_MODE}" > "${FILES[mode]}"
 
-    fzf "${FZF_ARGS[@]}" < "${FILES[pipe]}" > "${FILES[selection]}" &
-    FZF_PID="${!}"
+    populate_lists < <("${PKG_MANAGER}" -Sl) &
+    WRITER_PID="${!}"
 
-    populate_lists < <("${PKG_MANAGER}" -Sl)
-    wait "${FZF_PID}" || true
+    while [[ ! -f "${FILES["${START_MODE}"]}" ]]; do true; done
+    mapfile -t SELECTION < <(fzf "${FZF_ARGS[@]}" < "${FILES["${START_MODE}"]}")
+    kill -9 "${WRITER_PID}" 2>/dev/null || true
 
-    mapfile -t SELECTION < "${FILES[selection]}"
     [[ -z "${SELECTION[*]}" ]] && echo "No packages selected." && exit 0
-
     PACKAGES=("${SELECTION[@]#* }")
     PACKAGES=("${PACKAGES[@]%% *}")
 
