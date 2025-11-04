@@ -14,11 +14,15 @@ An opinionated fzf-powered menu for Pacman
 - [`tput`](https://github.com/mirror/ncurses)
 - [`pkill`](https://gitlab.com/procps-ng/procps)
 
+And one of:
+- [`run0`](https://github.com/systemd/systemd)
+- [`sudo`](https://www.sudo.ws/sudo)
+- [`doas`](https://github.com/Duncaen/OpenDoas)
+
 ### Optional
-- An AUR helper:
-    - [`paru`](https://github.com/Morganamilo/paru)
-    - [`yay`](https://github.com/Jguer/yay)
-    - Others (not coded out of the box)
+An AUR helper:
+- [`paru`](https://github.com/Morganamilo/paru)
+- [`yay`](https://github.com/Jguer/yay)
 
 ## Installation
 
@@ -41,6 +45,9 @@ chmod +x pacmenu.sh
 Usage: pacmenu.sh [OPTIONS]
 
 Options:
+    -a, --auth [run0|sudo|doas]
+            choose which privilege escalation program to run when running the operation.
+
     -p, --package-manager [paru|yay]
             select alternative package manager to use, enabling the aur menu if applicable.
 
