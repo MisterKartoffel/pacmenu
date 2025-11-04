@@ -4,8 +4,7 @@ trap 'exit_handler' INT TERM
 trap 'cleanup' EXIT
 
 function usage() {
-cat << EOF
-pacmenu - An opinionated fzf-powered menu for Pacman
+echo "pacmenu - An opinionated fzf-powered menu for Pacman
 
     ${ANSI[bold]}Project URL:${ANSI[reset]} ${ANSI[italic]}https://github.com/MisterKartoffel/pacmenu${ANSI[reset]}
     ${ANSI[bold]}Author:${ANSI[reset]} Felipe Duarte ${ANSI[italic]}<felipesdrs@hotmail.com>${ANSI[reset]}
@@ -20,7 +19,7 @@ pacmenu - An opinionated fzf-powered menu for Pacman
                 allows starting from any of the three available menus.
 
         ${ANSI[bold]}-r, --reinstall${ANSI[reset]}
-                shows installed packages in the install menus with the "[installed]" tag.
+                shows installed packages in the install menus with the \"[installed]\" tag.
 
         ${ANSI[bold]}-h, --help${ANSI[reset]}
                 show this help message.
@@ -28,8 +27,7 @@ pacmenu - An opinionated fzf-powered menu for Pacman
     ${ANSI[bold]}Menu actions:${ANSI[reset]}
         ${ANSI[bold]}Ctrl-s${ANSI[reset]}      Cycle between menus.
         ${ANSI[bold]}Tab${ANSI[reset]}         Select current item.
-        ${ANSI[bold]}Enter${ANSI[reset]}       Submit selection.
-EOF
+        ${ANSI[bold]}Enter${ANSI[reset]}       Submit selection."
 }
 
 function exit_handler() {
@@ -116,7 +114,7 @@ declare -A ANSI=(
 ) || exit 1
 
 declare -a PACKAGES || exit 1
-declare -a DEPENDS=(fzf tail) || exit 1
+declare -a DEPENDS=(fzf tail tput pkill) || exit 1
 declare -a FZF_ARGS=(
     --no-mouse
     --multi

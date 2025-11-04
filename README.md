@@ -10,6 +10,9 @@ An opinionated fzf-powered menu for Pacman
 
 ### Required
 - [`fzf`](https://github.com/junegunn/fzf)
+- [`tail`](https://github.com/coreutils/coreutils)
+- [`tput`](https://github.com/mirror/ncurses)
+- [`pkill`](https://gitlab.com/procps-ng/procps)
 
 ### Optional
 - An AUR helper:
