@@ -116,13 +116,13 @@ declare -A ANSI=(
 ) || exit 1
 
 declare -a PACKAGES || exit 1
-declare -a DEPENDS=(fzf) || exit 1
+declare -a DEPENDS=(fzf tail) || exit 1
 declare -a FZF_ARGS=(
     --no-mouse
     --multi
     --ansi
     --reverse
-    --prompt=": "
+    --prompt="loading : "
     --info="inline-right"
     --border="rounded"
     --border-label="⎸ pacman ⎹"
@@ -140,15 +140,22 @@ declare -a FZF_ARGS=(
     --bind="start:bg-transform-preview-label(
                 echo \"⎸ {2} ⎹\"
             )+bg-transform-input-label(
-                MODE=\$(<\"/tmp/pac_mode.txt\")
-                case \$MODE in
+                case \$START_MODE in
                     repos) echo \"⎸ [core] and [extra] ⎹\" ;;
-                    aur) echo \"⎸ AUR ⎹\" ;;
-                    uninstall) echo \"⎸ Uninstall ⎹\" ;;
+                    aur) echo \"⎸ aur ⎹\" ;;
+                    uninstall) echo \"⎸ uninstall ⎹\" ;;
+                esac
+            )+reload(
+                case \$START_MODE in
+                    repos) tail -F --lines=+0 --pid=\$WRITER_PID /tmp/pac_repos.txt ;;
+                    aur) tail -F --lines=+0 --pid=\$WRITER_PID /tmp/pac_aur.txt ;;
+                    uninstall) tail -F --lines=+0 --pid=\$WRITER_PID /tmp/pac_uninstall.txt ;;
                 esac
             )"
     --bind="load:bg-transform-preview-label(
                 echo \"⎸ {2} ⎹\"
+            )+bg-transform-prompt(
+                echo \":\"
             )+preview(
                 MODE=\$(<\"/tmp/pac_mode.txt\")
                 [[ \$MODE == \"uninstall\" ]] && \\
@@ -161,16 +168,16 @@ declare -a FZF_ARGS=(
                     repos)
                         if [[ \$PKG_MANAGER != \"pacman\" ]]; then
                             MODE=\"aur\"
-                            echo \"⎸ AUR ⎹\"
+                            echo \"⎸ aur ⎹\"
                         else
                             MODE=\"uninstall\"
-                            echo \"⎸ Uninstall ⎹\"
+                            echo \"⎸ uninstall ⎹\"
                         fi
                     ;;
 
                     aur)
                         MODE=\"uninstall\"
-                        echo \"⎸ Uninstall ⎹\"
+                        echo \"⎸ uninstall ⎹\"
                     ;;
 
                     uninstall)
@@ -182,9 +189,9 @@ declare -a FZF_ARGS=(
             )+reload(
                 MODE=\$(<\"/tmp/pac_mode.txt\")
                 case \$MODE in
-                    repos) cat /tmp/pac_repos.txt ;;
-                    aur) cat /tmp/pac_aur.txt ;;
-                    uninstall) cat /tmp/pac_uninstall.txt ;;
+                    repos) tail -F --lines=+0 --pid=\$WRITER_PID /tmp/pac_repos.txt ;;
+                    aur) tail -F --lines=+0 --pid=\$WRITER_PID /tmp/pac_aur.txt ;;
+                    uninstall) tail -F --lines=+0 --pid=\$WRITER_PID /tmp/pac_uninstall.txt ;;
                 esac
             )"
     --bind="result:bg-transform-list-label(
@@ -206,13 +213,6 @@ declare -a FZF_ARGS=(
                 [[ \$MODE == \"uninstall\" ]] && \\
                     \$PKG_MANAGER -Qi {2} || \\
                     \$PKG_MANAGER -Si {2}
-            )+reload(
-                MODE=\$(<\"/tmp/pac_mode.txt\")
-                case \$MODE in
-                    repos) cat /tmp/pac_repos.txt ;;
-                    aur) cat /tmp/pac_aur.txt ;;
-                    uninstall) cat /tmp/pac_uninstall.txt ;;
-                esac
             )"
     --color="prompt:#89B4FA,info:#4C4F69,spinner:#4C4F69,border:#FAB387,marker:#A6E3A1,
             label:#FAB387,input-label:#A6E3A1,list-label:#CDD6F4,preview-label:#89B4FA,footer-label:#4C4F69,
@@ -274,14 +274,15 @@ function main() {
 
     check_depends
 
-    export PKG_MANAGER
+    export PKG_MANAGER START_MODE
     echo "${START_MODE}" > "${FILES[mode]}"
 
     populate_lists < <("${PKG_MANAGER}" -Sl) &
     WRITER_PID="${!}"
+    export WRITER_PID
 
     while [[ ! -f "${FILES["${START_MODE}"]}" ]]; do true; done
-    mapfile -t SELECTION < <(fzf "${FZF_ARGS[@]}" < "${FILES["${START_MODE}"]}")
+    mapfile -t SELECTION < <(fzf "${FZF_ARGS[@]}")
     kill -9 "${WRITER_PID}" 2>/dev/null || true
 
     [[ -z "${SELECTION[*]}" ]] && echo "No packages selected." && exit 0
