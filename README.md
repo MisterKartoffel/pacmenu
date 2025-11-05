@@ -15,9 +15,9 @@ An opinionated fzf-powered menu for Pacman
 - [`pkill`](https://gitlab.com/procps-ng/procps)
 
 And one of:
-- [`run0`](https://github.com/systemd/systemd)
 - [`sudo`](https://www.sudo.ws/sudo)
 - [`doas`](https://github.com/Duncaen/OpenDoas)
+- [`run0`](https://github.com/systemd/systemd)
 
 ### Optional
 An AUR helper:
@@ -53,6 +53,12 @@ Options:
 
     -s, --start-mode [repos|aur|uninstall]
             allows starting from any of the three available menus.
+
+    -i, --install-flags <default: -S>
+            set additional flags for pacman's sync operation.
+
+    }-u, --uninstall-flags <default: -Rns>
+            set additional flags for pacman's remove operation.
 
     -r, --reinstall
             shows installed packages in the install menus with the "[installed]" tag.
