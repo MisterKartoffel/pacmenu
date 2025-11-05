@@ -316,8 +316,8 @@ function main() {
     declare PROCESS END_MODE
     declare -a SELECTION PACKAGES || exit 1
 
-
     check_depends
+    parse_arguments "${@}"
 
     [[ -z "${MANAGER}" ]]                          && MANAGER="$(check_opt_depends MANAGERS)"
     [[ -z "${AUTH}" && "${MANAGER}" == "pacman" ]] && AUTH="$(check_opt_depends SETUID)"
