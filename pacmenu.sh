@@ -50,7 +50,7 @@ declare -a FZF_ARGS=(
                 echo \"⎸ {2} ⎹\"
             )+bg-transform-input-label(
                 case \$START_MODE in
-                    repos) echo \"⎸ [core] and [extra] ⎹\" ;;
+                    repos) echo \"⎸ repos ⎹\" ;;
                     aur) echo \"⎸ aur ⎹\" ;;
                     uninstall) echo \"⎸ uninstall ⎹\" ;;
                 esac
@@ -91,7 +91,7 @@ declare -a FZF_ARGS=(
 
                     uninstall)
                         MODE=\"repos\"
-                        echo \"⎸ [core] and [extra] ⎹\"
+                        echo \"⎸ repos ⎹\"
                     ;;
                 esac
                 echo \$MODE > \$TMP_DIR/mode.txt
