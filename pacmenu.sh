@@ -313,7 +313,7 @@ function parse_arguments() {
 }
 
 function main() {
-    declare PROCESS END_MODE
+    declare END_MODE
     declare -a SELECTION PACKAGES || exit 1
 
     check_depends
@@ -340,12 +340,12 @@ function main() {
     END_MODE="$(<"${FILES[mode]}")"
     case "${END_MODE}" in
         aur) unset "${AUTH}" ;&
-        repos) PROCESS="sync" ;;
-        uninstall) PROCESS="remove" ;;
+        repos) END_MODE="sync" ;;
+        uninstall) END_MODE="remove" ;;
         *) print_error "mode" "${END_MODE}" ;;
     esac
 
-    "${AUTH}" "${MANAGER}" "${FLAGS["${PROCESS}"]}" "${PACKAGES[@]}"
+    "${AUTH}" "${MANAGER}" "${FLAGS["${END_MODE}"]}" "${PACKAGES[@]}"
 }
 
 main "${@}"
