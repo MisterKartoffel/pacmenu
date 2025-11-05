@@ -3,8 +3,9 @@
 trap 'exit_handler' INT TERM
 trap 'cleanup' EXIT
 
-declare REINSTALL WRITER_PID
+declare AUTH MANAGER REINSTALL WRITER_PID
 declare TMP_DIR="${XDG_RUNTIME_DIR:-/run/user/${UID}}/pac" || exit 1
+declare START_MODE="repos" || exit 1
 
 declare -A FILES=(
     [uninstall]="${TMP_DIR}/uninstall.txt"
@@ -21,7 +22,14 @@ declare -A ANSI=(
     [reset]="$(tput sgr0)"
 ) || exit 1
 
+declare -A FLAGS=(
+    [sync]="-S"
+    [remove]="-Rns"
+) || exit 1
+
 declare -a DEPENDS=(fzf tail tput pkill) || exit 1
+declare -a SETUID=(sudo doas run0) || exit 1
+declare -a MANAGERS=(paru yay pacman) || exit 1
 declare -a FZF_ARGS=(
     --multi
     --ansi
@@ -60,14 +68,14 @@ declare -a FZF_ARGS=(
             )+preview(
                 MODE=\$(<\"\$TMP_DIR/mode.txt\")
                 [[ \$MODE == \"uninstall\" ]] && \\
-                    \$PKG_MANAGER -Qi {2} || \\
-                    \$PKG_MANAGER -Si {2}
+                    \$MANAGER -Qi {2} || \\
+                    \$MANAGER -Si {2}
             )"
     --bind="ctrl-s:transform-input-label(
                 MODE=\$(<\"\$TMP_DIR/mode.txt\")
                 case \$MODE in
                     repos)
-                        if [[ \$PKG_MANAGER != \"pacman\" ]]; then
+                        if [[ \$MANAGER != \"pacman\" ]]; then
                             MODE=\"aur\"
                             echo \"⎸ aur ⎹\"
                         else
@@ -112,8 +120,8 @@ declare -a FZF_ARGS=(
             )+preview(
                 MODE=\$(<\"\$TMP_DIR/mode.txt\")
                 [[ \$MODE == \"uninstall\" ]] && \\
-                    \$PKG_MANAGER -Qi {2} || \\
-                    \$PKG_MANAGER -Si {2}
+                    \$MANAGER -Qi {2} || \\
+                    \$MANAGER -Si {2}
             )"
     --color="prompt:#89B4FA,info:#4C4F69,spinner:#4C4F69,border:#FAB387,marker:#A6E3A1,
             label:#FAB387,input-label:#A6E3A1,list-label:#CDD6F4,preview-label:#89B4FA,footer-label:#4C4F69,
@@ -131,17 +139,23 @@ echo "pacmenu - An opinionated fzf-powered menu for Pacman
 
     ${ANSI[bold]}Options:${ANSI[reset]}
 
-        ${ANSI[bold]}-a, --auth${ANSI[reset]} [${ANSI[underline]}run0${ANSI[reset]}|sudo|doas]
+        ${ANSI[bold]}-a, --auth${ANSI[reset]} [sudo|doas|run0]
                 choose which privilege escalation program to run when running the operation.
 
         ${ANSI[bold]}-p, --package-manager${ANSI[reset]} [paru|yay]
                 select alternative package manager to use, enabling the aur menu if applicable.
 
-        ${ANSI[bold]}-s, --start-mode${ANSI[reset]} [${ANSI[underline]}repos${ANSI[reset]}|aur|uninstall]
+        ${ANSI[bold]}-s, --start-mode${ANSI[reset]} [repos|aur|uninstall]
                 allows starting from any of the three available menus.
 
+        ${ANSI[bold]}-i, --install-flags${ANSI[reset]} ${ANSI[italic]}<default: -S>${ANSI[reset]}
+                set additional flags for pacman's sync operation.
+
+        ${ANSI[bold]}-u, --uninstall-flags${ANSI[reset]} ${ANSI[italic]}<default: -Rns>${ANSI[reset]}
+                set additional flags for pacman's remove operation.
+
         ${ANSI[bold]}-r, --reinstall${ANSI[reset]}
-                shows installed packages in the install menus with the \"[installed]\" tag.
+                shows installed packages in the install menus with the [installed] tag.
 
         ${ANSI[bold]}-h, --help${ANSI[reset]}
                 show this help message.
@@ -166,23 +180,28 @@ function cleanup() {
     wait 2>/dev/null || true
 }
 
-function arg_error() {
+function print_error() {
     declare PROGRAM_NAME="pacmenu"
     declare TYPE="${1}"
-    declare OPTION="${2}"
+    declare CAUSE="${2}"
     declare ARGUMENT="${3}"
 
     case "${TYPE}" in
         option)
             printf "%s: invalid option -- '%s'\n" \
                 "${PROGRAM_NAME}" \
-                "${OPTION}" ;;
+                "${CAUSE}" ;;
 
         argument)
             printf "%s: invalid argument for '%s' -- '%s'\n" \
                 "${PROGRAM_NAME}" \
-                "${OPTION}" \
+                "${CAUSE}" \
                 "${ARGUMENT}" ;;
+
+        dependency)
+            printf "%s: dependency '%s' not satisfied\n" \
+                "${PROGRAM_NAME}" \
+                "${CAUSE}" ;;
 
         *) exit 1 ;;
     esac
@@ -191,16 +210,31 @@ function arg_error() {
     exit 1
 }
 
+function check_opt_depends() {
+    declare COMMAND
+    declare -n OPT_DEPENDS="${1}" || exit 1
+
+    for COMMAND in "${OPT_DEPENDS[@]}"; do
+        if command -v "${COMMAND}" >/dev/null; then
+            echo "${COMMAND}"
+            return 0
+        fi
+    done
+
+    print_error "dependency" "${1}"
+}
+
 function check_depends() {
+    declare COMMAND
+
     for COMMAND in "${DEPENDS[@]}"; do
         if ! command -v "${COMMAND}" >/dev/null; then
-            echo "${COMMAND} is missing. Exiting."
-            exit 1
+            print_error "dependency" "${COMMAND}"
         fi
     done
 }
 
-function populate_lists() {
+function source_packages() {
     declare REPO PACKAGE VERSION INSTALLED
     declare -a TARGETS FORMATS || exit 1
 
@@ -215,52 +249,50 @@ function populate_lists() {
         for i in "${!TARGETS[@]}"; do
             printf "%b\n" "${FORMATS[i]}" >> "${TARGETS[i]}"
         done
-    done
+    done < <("${MANAGER}" -Sl)
 }
 
-function main() {
-    declare START_MODE="repos"
-    declare PKG_MANAGER="pacman"
-    declare AUTH="run0"
-    declare PROCESS
-    declare -a SELECTION PACKAGES || exit 1
-    declare -A FLAGS=(
-        [install]="-S"
-        [uninstall]="-Rns"
-    ) || exit 1
-
+function parse_arguments() {
     while [[ "${#}" -gt 0 ]]; do
         case "${1}" in
             -a|--auth)
                 case "${2}" in
-                    run0|sudo|doas)
+                    sudo|doas|run0)
                         AUTH="${2}"
                         DEPENDS+=("${AUTH}")
                         shift 2 ;;
 
-                    *) arg_error "argument" "${1}" "${2}" ;;
+                    *) print_error "argument" "${1}" "${2}" ;;
                 esac ;;
 
             -p|--package-manager)
                 case "${2}" in
                     paru|yay)
-                        PKG_MANAGER="${2}"
-                        DEPENDS+=("${PKG_MANAGER}")
+                        MANAGER="${2}"
+                        DEPENDS+=("${MANAGER}")
                         shift 2 ;;
 
-                    *) arg_error "argument" "${1}" "${2}" ;;
+                    *) print_error "argument" "${1}" "${2}" ;;
                 esac ;;
 
             -s|--start-mode)
                 case "${2}" in
-                    aur) [[ "${PKG_MANAGER}" == "pacman" ]] && arg_error "argument" "${1}" "${2}" ;&
+                    aur) [[ "${MANAGER}" == "pacman" ]] && print_error "argument" "${1}" "${2}" ;&
 
                     repos|uninstall)
                         START_MODE="${2}"
                         shift 2 ;;
 
-                    *) arg_error "argument" "${1}" "${2}" ;;
+                    *) print_error "argument" "${1}" "${2}" ;;
                 esac ;;
+
+            -i|--install-flags)
+                FLAGS[sync]="-S${2}"
+                shift 2 ;;
+
+            -u|--uninstall-flags)
+                FLAGS[remove]="-R${2}"
+                shift 2 ;;
 
             -r|--reinstall)
                 REINSTALL=1
@@ -270,17 +302,26 @@ function main() {
                 usage
                 exit 0 ;;
 
-            *) arg_error "option" "${1}" "${2}" ;;
+            *) print_error "option" "${1}" "${2}" ;;
         esac
     done
+}
+
+function main() {
+    declare PROCESS
+    declare -a SELECTION PACKAGES || exit 1
+
 
     check_depends
 
-    export PKG_MANAGER START_MODE TMP_DIR
+    [[ -z "${MANAGER}" ]]                          && MANAGER="$(check_opt_depends MANAGERS)"
+    [[ -z "${AUTH}" && "${MANAGER}" == "pacman" ]] && AUTH="$(check_opt_depends SETUID)"
+
+    export MANAGER START_MODE TMP_DIR
     [[ -d "${TMP_DIR}" ]] || mkdir "${TMP_DIR}"
     echo "${START_MODE}" > "${FILES[mode]}"
 
-    populate_lists < <("${PKG_MANAGER}" -Sl) &
+    source_packages &
     WRITER_PID="${!}"
     export WRITER_PID
 
@@ -292,17 +333,16 @@ function main() {
     PACKAGES=("${PACKAGES[@]%% *}")
 
     case "$(<"${FILES[mode]}")" in
-        uninstall) PROCESS="uninstall" ;;
-        aur) unset AUTH ;&
-        repos) PROCESS="install" ;;
+        aur) unset "${AUTH}" ;&
+        repos) PROCESS="sync" ;;
+        uninstall) PROCESS="remove" ;;
 
         *)
             printf "pacmenu: Unknown mode -- '%s'\n" "${MODE}"
-            exit 1
-            ;;
+            exit 1 ;;
     esac
 
-    "${AUTH}" "${PKG_MANAGER}" "${FLAGS["${PROCESS}"]}" "${PACKAGES[@]}"
+    "${AUTH}" "${MANAGER}" "${FLAGS["${PROCESS}"]}" "${PACKAGES[@]}"
 }
 
 main "${@}"
