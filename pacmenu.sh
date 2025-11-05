@@ -190,18 +190,23 @@ function print_error() {
         option)
             printf "%s: invalid option -- '%s'\n" \
                 "${PROGRAM_NAME}" \
-                "${CAUSE}" ;;
+                "${CAUSE}" >&2 ;;
 
         argument)
             printf "%s: invalid argument for '%s' -- '%s'\n" \
                 "${PROGRAM_NAME}" \
                 "${CAUSE}" \
-                "${ARGUMENT}" ;;
+                "${ARGUMENT}" >&2 ;;
 
         dependency)
             printf "%s: dependency '%s' not satisfied\n" \
                 "${PROGRAM_NAME}" \
-                "${CAUSE}" ;;
+                "${CAUSE}" >&2 ;;
+
+        mode)
+            printf "%s: undefined mode -- '%s'\n" \
+                "${PROGRAM_NAME}" \
+                "${CAUSE}" >&2 ;;
 
         *) exit 1 ;;
     esac
@@ -308,7 +313,7 @@ function parse_arguments() {
 }
 
 function main() {
-    declare PROCESS
+    declare PROCESS END_MODE
     declare -a SELECTION PACKAGES || exit 1
 
 
@@ -328,18 +333,16 @@ function main() {
     while [[ ! -f "${FILES["${START_MODE}"]}" ]]; do true; done
     mapfile -t SELECTION < <(fzf "${FZF_ARGS[@]}")
 
-    [[ -z "${SELECTION[*]}" ]] && echo "No packages selected." && exit 0
+    [[ -n "${SELECTION[*]}" ]] || exit 0
     PACKAGES=("${SELECTION[@]#* }")
     PACKAGES=("${PACKAGES[@]%% *}")
 
-    case "$(<"${FILES[mode]}")" in
+    END_MODE="$(<"${FILES[mode]}")"
+    case "${END_MODE}" in
         aur) unset "${AUTH}" ;&
         repos) PROCESS="sync" ;;
         uninstall) PROCESS="remove" ;;
-
-        *)
-            printf "pacmenu: Unknown mode -- '%s'\n" "${MODE}"
-            exit 1 ;;
+        *) print_error "mode" "${END_MODE}" ;;
     esac
 
     "${AUTH}" "${MANAGER}" "${FLAGS["${PROCESS}"]}" "${PACKAGES[@]}"
