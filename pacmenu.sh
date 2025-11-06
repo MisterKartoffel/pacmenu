@@ -305,6 +305,7 @@ function main() {
 
     while [[ ! -f "${FILES["${START_MODE}"]}" ]]; do true; done
     mapfile -t SELECTION < <(fzf "${FZF_ARGS[@]}")
+    kill -9 "${WRITER_PID}" 2>/dev/null || true
 
     [[ -n "${SELECTION[*]}" ]] || exit 0
     PACKAGES=("${SELECTION[@]#* }")
