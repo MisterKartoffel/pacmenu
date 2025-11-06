@@ -44,55 +44,32 @@ declare -a FZF_ARGS=(
     --footer-label="⎸ selected packages ⎹"
     --footer-border="rounded"
     --bind="change:first"
-    --bind="start:bg-transform-prompt(
-                echo \"loading : \"
-            )+bg-transform-preview-label(
-                echo \"⎸ {2} ⎹\"
-            )+bg-transform-input-label(
-                case \$START_MODE in
-                    repos) echo \"⎸ repos ⎹\" ;;
-                    aur) echo \"⎸ aur ⎹\" ;;
-                    uninstall) echo \"⎸ uninstall ⎹\" ;;
-                esac
-            )+reload(
+    --bind="start:reload(
                 case \$START_MODE in
                     repos) tail -F --lines=+0 --pid=\$WRITER_PID \$TMP_DIR/repos.txt ;;
                     aur) tail -F --lines=+0 --pid=\$WRITER_PID \$TMP_DIR/aur.txt ;;
                     uninstall) tail -F --lines=+0 --pid=\$WRITER_PID \$TMP_DIR/uninstall.txt ;;
                 esac
+            )+bg-transform-preview-label(
+                echo \"⎸ {2} ⎹\"
+            )+bg-transform-input-label(
+                echo \"⎸ \$START_MODE ⎹\"
+            )+bg-transform-prompt(
+                echo \"loading : \"
             )"
-    --bind="load:bg-transform-preview-label(
+    --bind="load:preview(
+                \$MANAGER -Qi {2} 2>/dev/null || \$MANAGER -Si {2}
+            )+bg-transform-preview-label(
                 echo \"⎸ {2} ⎹\"
             )+bg-transform-prompt(
                 echo \": \"
-            )+preview(
-                MODE=\$(<\"\$TMP_DIR/mode.txt\")
-                [[ \$MODE == \"uninstall\" ]] && \\
-                    \$MANAGER -Qi {2} || \\
-                    \$MANAGER -Si {2}
             )"
-    --bind="ctrl-s:transform-input-label(
+    --bind="ctrl-s:execute-silent(
                 MODE=\$(<\"\$TMP_DIR/mode.txt\")
                 case \$MODE in
-                    repos)
-                        if [[ \$MANAGER != \"pacman\" ]]; then
-                            MODE=\"aur\"
-                            echo \"⎸ aur ⎹\"
-                        else
-                            MODE=\"uninstall\"
-                            echo \"⎸ uninstall ⎹\"
-                        fi
-                    ;;
-
-                    aur)
-                        MODE=\"uninstall\"
-                        echo \"⎸ uninstall ⎹\"
-                    ;;
-
-                    uninstall)
-                        MODE=\"repos\"
-                        echo \"⎸ repos ⎹\"
-                    ;;
+                    repos) MODE=\"aur\"; [[ \$MANAGER == \"pacman\" ]] && MODE=\"uninstall\" ;;
+                    aur) MODE=\"uninstall\" ;;
+                    uninstall) MODE=\"repos\" ;;
                 esac
                 echo \$MODE > \$TMP_DIR/mode.txt
             )+reload(
@@ -102,12 +79,11 @@ declare -a FZF_ARGS=(
                     aur) tail -F --lines=+0 --pid=\$WRITER_PID \$TMP_DIR/aur.txt ;;
                     uninstall) tail -F --lines=+0 --pid=\$WRITER_PID \$TMP_DIR/uninstall.txt ;;
                 esac
+            )+bg-transform-input-label(
+                MODE=\$(<\"\$TMP_DIR/mode.txt\")
+                echo \"⎸ \$MODE ⎹\"
             )"
-    --bind="result:bg-transform-list-label(
-                [[ -n \$FZF_QUERY ]] && \\
-                    echo \"⎸ \$FZF_MATCH_COUNT matches for '\$FZF_QUERY' ⎹\" || \\
-                    echo \"\"
-            )"
+    --bind="result:bg-transform-list-label([[ -n \$FZF_QUERY ]] && echo \"⎸ \$FZF_MATCH_COUNT matches for '\$FZF_QUERY' ⎹\")"
     --bind="multi:bg-transform-footer(
                 if [[ \$FZF_SELECT_COUNT -ge 1 ]]; then
                     MODE=\$(<\"\$TMP_DIR/mode.txt\")
@@ -118,10 +94,7 @@ declare -a FZF_ARGS=(
     --bind="focus:bg-transform-preview-label(
                 echo \"⎸ {2} ⎹\"
             )+preview(
-                MODE=\$(<\"\$TMP_DIR/mode.txt\")
-                [[ \$MODE == \"uninstall\" ]] && \\
-                    \$MANAGER -Qi {2} || \\
-                    \$MANAGER -Si {2}
+                \$MANAGER -Qi {2} 2>/dev/null || \$MANAGER -Si {2}
             )"
     --color="prompt:#89B4FA,info:#4C4F69,spinner:#4C4F69,border:#FAB387,marker:#A6E3A1,
             label:#FAB387,input-label:#A6E3A1,list-label:#CDD6F4,preview-label:#89B4FA,footer-label:#4C4F69,
