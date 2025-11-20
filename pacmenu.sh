@@ -31,6 +31,9 @@ declare -a DEPENDS=(fzf tail tput pkill) || exit 1
 declare -a SETUID=(sudo doas run0) || exit 1
 declare -a MANAGERS=(paru yay pacman) || exit 1
 declare -a FZF_ARGS=(
+    --read0
+    --highlight-line
+    --accept-nth 1
     --multi
     --ansi
     --reverse
@@ -40,7 +43,7 @@ declare -a FZF_ARGS=(
     --input-border="rounded"
     --list-border="rounded"
     --preview-border="rounded"
-    --preview-window="right,60%"
+    --preview-window="right,70%"
     --footer-label="⎸ selected packages ⎹"
     --footer-border="rounded"
     --bind="change:first"
@@ -51,16 +54,16 @@ declare -a FZF_ARGS=(
                     uninstall) tail -F --lines=+0 --pid=\$WRITER_PID \$TMP_DIR/uninstall.txt ;;
                 esac
             )+bg-transform-preview-label(
-                echo \"⎸ {2} ⎹\"
+                echo \"⎸ {1} ⎹\"
             )+bg-transform-input-label(
                 echo \"⎸ \$START_MODE ⎹\"
             )+bg-transform-prompt(
                 echo \"loading : \"
             )"
     --bind="load:preview(
-                \$MANAGER -Qi {2} 2>/dev/null || \$MANAGER -Si {2}
+                \$MANAGER -Qii {1} 2>/dev/null || \$MANAGER -Sii {1}
             )+bg-transform-preview-label(
-                echo \"⎸ {2} ⎹\"
+                echo \"⎸ {1} ⎹\"
             )+bg-transform-prompt(
                 echo \": \"
             )"
@@ -88,13 +91,13 @@ declare -a FZF_ARGS=(
                 if [[ \$FZF_SELECT_COUNT -ge 1 ]]; then
                     MODE=\$(<\"\$TMP_DIR/mode.txt\")
                     [[ \$MODE == \"uninstall\" ]] && COLOR=\$(tput setaf 1)
-                    printf \"\$COLOR%s\n\" {+}
+                    printf \"\$COLOR%s\n\" {+1}
                 fi
             )"
     --bind="focus:bg-transform-preview-label(
-                echo \"⎸ {2} ⎹\"
+                echo \"⎸ {1} ⎹\"
             )+preview(
-                \$MANAGER -Qi {2} 2>/dev/null || \$MANAGER -Si {2}
+                \$MANAGER -Qii {1} 2>/dev/null || \$MANAGER -Sii {1}
             )"
     --color="prompt:#89B4FA,info:#4C4F69,spinner:#4C4F69,border:#FAB387,marker:#A6E3A1,
             label:#FAB387,input-label:#A6E3A1,list-label:#CDD6F4,preview-label:#89B4FA,footer-label:#4C4F69,
@@ -217,15 +220,15 @@ function source_packages() {
     declare -a TARGETS FORMATS || exit 1
 
     while read -r REPO PACKAGE VERSION INSTALLED; do
-        FORMATS[1]="${ANSI[gray]}${REPO}${ANSI[reset]} ${PACKAGE} ${ANSI[gray]}${VERSION}"
-        FORMATS[0]="${FORMATS[1]} ${INSTALLED}"
+        FORMATS[0]="${PACKAGE} ${ANSI[gray]}${INSTALLED}\n[${REPO}] ${VERSION}${ANSI[reset]}"
+        FORMATS[1]="${FORMATS[0]/"${INSTALLED}"/}"
 
         [[ "${REPO}" == "aur" ]] && TARGETS[0]="${FILES[aur]}"       || TARGETS[0]="${FILES[repos]}"
         [[ -n "${INSTALLED}" ]]  && TARGETS[1]="${FILES[uninstall]}" || TARGETS[1]="/dev/null"
         [[ -z "${REINSTALL}" && -n "${INSTALLED}" ]] && TARGETS[0]="/dev/null"
 
         for i in "${!TARGETS[@]}"; do
-            printf "%b\n" "${FORMATS[i]}" >> "${TARGETS[i]}"
+            printf "%b\0" "${FORMATS[i]}" >> "${TARGETS[i]}"
         done
     done < <("${MANAGER}" -Sl)
 }
@@ -287,7 +290,7 @@ function parse_arguments() {
 
 function main() {
     declare END_MODE
-    declare -a SELECTION PACKAGES || exit 1
+    declare -a SELECTION || exit 1
 
     check_depends
     parse_arguments "${@}"
@@ -306,10 +309,7 @@ function main() {
     while [[ ! -f "${FILES["${START_MODE}"]}" ]]; do true; done
     mapfile -t SELECTION < <(fzf "${FZF_ARGS[@]}")
     kill -9 "${WRITER_PID}" 2>/dev/null || true
-
     [[ -n "${SELECTION[*]}" ]] || exit 0
-    PACKAGES=("${SELECTION[@]#* }")
-    PACKAGES=("${PACKAGES[@]%% *}")
 
     END_MODE="$(<"${FILES[mode]}")"
     case "${END_MODE}" in
@@ -319,7 +319,7 @@ function main() {
         *) print_error "mode" "${END_MODE}" ;;
     esac
 
-    "${AUTH}" "${MANAGER}" "${FLAGS["${END_MODE}"]}" "${PACKAGES[@]}"
+    "${AUTH}" "${MANAGER}" "${FLAGS["${END_MODE}"]}" "${SELECTION[@]}"
 }
 
 main "${@}"
