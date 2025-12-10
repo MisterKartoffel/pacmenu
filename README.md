@@ -57,7 +57,7 @@ Options:
     -i, --install-flags <default: -S>
             set additional flags for pacman's sync operation.
 
-    }-u, --uninstall-flags <default: -Rns>
+    -u, --uninstall-flags <default: -Rns>
             set additional flags for pacman's remove operation.
 
     -r, --reinstall
